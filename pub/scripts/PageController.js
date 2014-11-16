@@ -442,18 +442,6 @@ PageController.prototype.getMinParams = function () {
 }
 
 
-PageController.prototype.useUrl = function () {
-  var urlParameters = Utils.getUrlParameters()
-
-  // support prior csvUrl parameter
-  urlParameters.dataUrl = urlParameters.csvUrl || urlParameters.dataUrl
-
-  if (!urlParameters.dataUrl) return
-  $('.data-input').val(urlParameters.dataUrl)
-  this.setupPage(urlParameters)
-}
-
-
 PageController.prototype.prepareDataUrl = function (url) {
   // Prepare Google Spreadsheets url
   if (url.indexOf('https://docs.google.com/spreadsheets/d/') === 0) {
