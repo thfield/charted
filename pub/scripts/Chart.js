@@ -166,7 +166,6 @@ Chart.prototype.render = function () {
   this.plotAll()
   this.updateSelectedX()
   this.legend.update()
-  //this.drawPie()
 }
 
 Chart.prototype.applyChartColors = function () {
@@ -478,10 +477,10 @@ Chart.prototype.chartHTML = function (parameters) {
   template +='      <div class="x-axis"><span class="x-beginning"></span><span class="x-end"></span></div>'
   template +='      <div class="selection">'
   template +='        <div class="selection-info">'
-  template +='          <div class="selection-pie"></div>'
   template +='          <div class="selection-value"></div>'
   template +='          <div class="selection-xlabel"></div>'
   template +='          <div class="selection-ylabel"></div>'
+  template +='          <div class="selection-pie"></div>'
   template +='        </div>'
   template +='      </div>'
   template +='      <figure class="chart-plot chart-height"></figure>'
@@ -509,27 +508,26 @@ Chart.prototype.yAxisLabelHTML = function (interval) {
 }
 
 Chart.prototype.drawPie = function (index) {
-  //thfbookmark
-
+  //todo: pie doesn't attach to correct series when chart gets moved
   var dataarray = []
       seriesesLength = this.data.getSeriesCount();
 
   for (var i=0; i < seriesesLength; i++){
     dataarray[i]=  this.data.getDatum(i,this.selectedX).y;
   }
-  
-  //console.log(dataarray);   
-  
-  var width = 100,
+    
+  var width = this.$selectionValue.height(),
       height = 100,
       radius = Math.min(width, height) / 2;
 
   var color = d3.scale.ordinal()
-      .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+      .range(this.colorRange);  
+      //todo: do away with this var and use this.colorFn()
+      //      first have to get 'ylabels' as part of dataarray
 
   var arc = d3.svg.arc()
       .outerRadius(radius - 10)
-      .innerRadius(0);
+      .innerRadius(10);
 
   var pie = d3.layout.pie()
       .sort(null)
@@ -549,6 +547,5 @@ Chart.prototype.drawPie = function (index) {
   g.append("path")
       .attr("d", arc)
       .style("fill", function(d,i) { return color(i); });
-
 }
 
