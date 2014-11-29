@@ -18,6 +18,7 @@ function Chart(pageController, chartIndex, $wrapper, params, data) {
   this.$yAxis = this.$container.find('.y-axis')
   this.$zeroLine = this.$container.find('.zero-line')
   this.$selectionValue = this.$container.find('.selection-value')
+  this.$selectionPie = this.$container.find('.selection-pie')
   this.$optionsElem = this.$container.find('.chart-options')
   this.$pageSettings = $('.page-settings')
   this.$chartDescription = this.$container.find('.chart-description')
@@ -165,6 +166,7 @@ Chart.prototype.render = function () {
   this.plotAll()
   this.updateSelectedX()
   this.legend.update()
+  //this.drawPie()
 }
 
 Chart.prototype.applyChartColors = function () {
@@ -254,6 +256,8 @@ Chart.prototype.updateSelectedX = function (index) {
   var thisXPosition = this.xPosition(this.data.getDatum(0, this.selectedX))
   var adjust = 0.5 * this.xBarWidth(this.data.getDatum(0, this.selectedX))
   var selectionLeft = thisXPosition + adjust
+  // Clear any existing pies
+  this.$selectionPie.empty()
 
   // move selection
   this.$selectionElem.css('left', selectionLeft)
@@ -310,6 +314,7 @@ Chart.prototype.updateSelectedX = function (index) {
   }
 
   this.updateSelectionText()
+  this.drawPie()
 }
 
 Chart.prototype.updateSelectionText = function() {
@@ -473,6 +478,7 @@ Chart.prototype.chartHTML = function (parameters) {
   template +='      <div class="x-axis"><span class="x-beginning"></span><span class="x-end"></span></div>'
   template +='      <div class="selection">'
   template +='        <div class="selection-info">'
+  template +='          <div class="selection-pie"></div>'
   template +='          <div class="selection-value"></div>'
   template +='          <div class="selection-xlabel"></div>'
   template +='          <div class="selection-ylabel"></div>'
@@ -501,3 +507,48 @@ Chart.prototype.chartHTML = function (parameters) {
 Chart.prototype.yAxisLabelHTML = function (interval) {
   return _.template('<div class="y-axis-label" style="top:<%- top %>px"><%- display %></div>', interval)
 }
+
+Chart.prototype.drawPie = function (index) {
+  //thfbookmark
+
+  var dataarray = []
+      seriesesLength = this.data.getSeriesCount();
+
+  for (var i=0; i < seriesesLength; i++){
+    dataarray[i]=  this.data.getDatum(i,this.selectedX).y;
+  }
+  
+  //console.log(dataarray);   
+  
+  var width = 100,
+      height = 100,
+      radius = Math.min(width, height) / 2;
+
+  var color = d3.scale.ordinal()
+      .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+  var arc = d3.svg.arc()
+      .outerRadius(radius - 10)
+      .innerRadius(0);
+
+  var pie = d3.layout.pie()
+      .sort(null)
+      .value(function(d) { return d; });
+
+  var svg = d3.select('.selection-pie').append("svg")
+      .attr("width", width)
+      .attr("height", height)
+    .append("g")
+      .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+  var g = svg.selectAll(".arc")
+      .data(pie(dataarray))
+    .enter().append("g")
+      .attr("class", "arc");
+
+  g.append("path")
+      .attr("d", arc)
+      .style("fill", function(d,i) { return color(i); });
+
+}
+
