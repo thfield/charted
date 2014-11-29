@@ -130,6 +130,7 @@ Utils.getTrimmedExtent = function (array) {
 
 Utils.getFileExtension = function (fileString) {
   // remove any url parameters
-  fileStringWithoutParams = fileString.substring(0, fileString.indexOf('?'))
-  return fileStringWithoutParams.split('.').pop()
+  var fileStringWithoutParams = fileString.substring(0, fileString.indexOf('?'))
+  var fileExtention = fileStringWithoutParams.split('.').pop()
+  return fileExtention.toLowerCase()
 }
