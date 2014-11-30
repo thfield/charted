@@ -313,7 +313,9 @@ Chart.prototype.updateSelectedX = function (index) {
   }
 
   this.updateSelectionText()
-  this.drawPie()
+  if(this.params.pie === 'on'){
+    this.drawPie()
+  } 
 }
 
 Chart.prototype.updateSelectionText = function() {
@@ -497,6 +499,9 @@ Chart.prototype.chartHTML = function (parameters) {
   template +='        <span class="icon icon-round-off"></span>'
   template +='        <span class="icon icon-round-on"></span>'
   template +='      </a>'
+  template +='      <a class="option-item toggle-pie" href="#" title="Turn minipie on/off">'
+  template +='        <span class="icon icon-pie"></span>'
+  template +='      </a>'
   template +='    </div>'
   template +='  </aside>'
   template +='</div>'
@@ -509,13 +514,18 @@ Chart.prototype.yAxisLabelHTML = function (interval) {
 
 Chart.prototype.drawPie = function () {
   //todo: pie doesn't attach to correct series when chart gets moved
-  var dataarray = [],
+  var dataArray = [],
+      dataObject = {},
       seriesesLength = this.data.getSeriesCount();
 
   for (var i=0; i < seriesesLength; i++){
-    dataarray[i]=  this.data.getDatum(i,this.selectedX).y;
+    //dataarray[i] = this.data.getDatum(i,this.selectedX).y;
+    //dataarray[i] = this.data.getDatum(i,this.selectedX);
+    dataObject[i] = this.data.getDatum(i,this.selectedX);
+    dataObject[i].label = this.data.getSeries(dataObject[i].ySeries).label;
+    dataArray[i] = dataObject[i].y;
   }
-    
+
   var width = this.$selectionValue.height(),
       height = 100,
       radius = Math.min(width, height) / 2;
@@ -523,7 +533,7 @@ Chart.prototype.drawPie = function () {
   var color = d3.scale.ordinal()
       .range(this.colorRange);  
       //todo: do away with this var and use this.colorFn()
-      //      first have to get 'ylabels' as part of dataarray
+      //      first have to get 'ylabels' (series.label) as part of dataArray
 
   var arc = d3.svg.arc()
       .outerRadius(radius - 10)
@@ -540,12 +550,13 @@ Chart.prototype.drawPie = function () {
       .attr('transform', 'translate(' + width / 2 + ',' + height / 2 + ')');
 
   var g = svg.selectAll('.arc')
-      .data(pie(dataarray))
+      .data(pie(dataArray))
     .enter().append('g')
       .attr('class', 'arc');
 
   g.append('path')
       .attr('d', arc)
       .style('fill', function(d,i) { return color(i); });
+      //.style('fill', function(d,i) { return this.colorFn(dataObject[i].label); });
 }
 

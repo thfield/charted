@@ -8,7 +8,8 @@ function PageController () {
   // default values are first
   this.OPTIONS = {
     type: ['column', 'line'],
-    rounding: ['on', 'off']
+    rounding: ['on', 'off'],
+    pie: ['on', 'off']
   }
   this.EDITABLES = ['title', 'note']
 
