@@ -519,21 +519,13 @@ Chart.prototype.drawPie = function () {
       seriesesLength = this.data.getSeriesCount();
 
   for (var i=0; i < seriesesLength; i++){
-    //dataarray[i] = this.data.getDatum(i,this.selectedX).y;
-    //dataarray[i] = this.data.getDatum(i,this.selectedX);
     dataObject[i] = this.data.getDatum(i,this.selectedX);
-    dataObject[i].label = this.data.getSeries(dataObject[i].ySeries).label;
+    dataObject[i].color = this.colorFn(this.data.getSeries(dataObject[i].ySeries).label);
     dataArray[i] = dataObject[i].y;
   }
 
-  var width = this.$selectionValue.height(),
-      height = 100,
-      radius = Math.min(width, height) / 2;
-
-  var color = d3.scale.ordinal()
-      .range(this.colorRange);  
-      //todo: do away with this var and use this.colorFn()
-      //      first have to get 'ylabels' (series.label) as part of dataArray
+  var diameter = this.$selectionValue.height(),
+      radius = diameter / 2;
 
   var arc = d3.svg.arc()
       .outerRadius(radius - 10)
@@ -544,10 +536,10 @@ Chart.prototype.drawPie = function () {
       .value(function(d) { return d; });
 
   var svg = d3.select('.selection-pie').append('svg')
-      .attr('width', width)
-      .attr('height', height)
+      .attr('width', diameter)
+      .attr('height', diameter)
     .append('g')
-      .attr('transform', 'translate(' + width / 2 + ',' + height / 2 + ')');
+      .attr('transform', 'translate(' + radius + ',' + radius + ')');
 
   var g = svg.selectAll('.arc')
       .data(pie(dataArray))
@@ -556,7 +548,6 @@ Chart.prototype.drawPie = function () {
 
   g.append('path')
       .attr('d', arc)
-      .style('fill', function(d,i) { return color(i); });
-      //.style('fill', function(d,i) { return this.colorFn(dataObject[i].label); });
+      .style('fill', function(d,i) { return dataObject[i].color; });
 }
 
