@@ -3,6 +3,8 @@
 function PageController () {
   this.DARK = 'dark'
   this.LIGHT = 'light'
+  this.FULL = 'full'
+  this.SPLIT = 'split'
   this.chartObjects = []
 
   // default values are first
@@ -22,21 +24,36 @@ function PageController () {
       this.setDimensions()
     }.bind(this), 30)
   }.bind(this))
+
+  // setup keystrokes
+  $(document).keyup(function(e) {
+    if (e.keyCode == 27) {
+      $('.overlay-container').remove()
+      $('.page-settings').removeClass('open')
+
+    }
+  })
 }
 
 
-PageController.prototype.setupPage = function (urlParameters) {
+PageController.prototype.setupPage = function (parameters) {
   this.$body.addClass('loading')
-  this.parameters = urlParameters
+  this.updatePageTitle('Charted (...)')
+  this.parameters = parameters
   this.parameters.dataUrl = this.prepareDataUrl(this.parameters.dataUrl)
   this.parameters.charts = this.parameters.charts || [{}]
+  this.parameters.embed = this.parameters.embed || null
   this.clearExisting()
 
-  // populate charts and refresh every 30 minutes
+  // populate charts and refresh every 30 minutes,
+  // unless this is an embed.
   this.resetCharts()
-  setInterval(function () {
-    this.resetCharts()
-  }.bind(this), 1000 * 60 * 30)
+
+  if (!this.parameters.embed) {
+    setInterval(function () {
+      this.resetCharts()
+    }.bind(this), 1000 * 60 * 30)
+  }
 }
 
 
@@ -48,6 +65,9 @@ PageController.prototype.clearExisting = function () {
 
 
 PageController.prototype.setupPageSettings = function () {
+  // if this is an embed, don't add the page settings
+  if (this.parameters.embed) return
+
   // populate UI
   this.$body.append(this.pageSettingsHTML())
   var $pageSettings = this.$body.find('.page-settings')
@@ -55,8 +75,6 @@ PageController.prototype.setupPageSettings = function () {
   $('.download-data').attr('href', this.parameters.dataUrl)
   $('.data-url').text(this.parameters.dataUrl)
 
-   // set background color
-  this.applyColor()
 
   // bind intereactions
   $pageSettings.find('.settings').click(function (event) {
@@ -76,6 +94,10 @@ PageController.prototype.setupPageSettings = function () {
     this.toggleColor()
   }.bind(this))
 
+  $pageSettings.find('.get-embed').click(function () {
+    this.getEmbed()
+  }.bind(this))
+
   $pageSettings.find('.update-data-url').click(function () {
     this.setupPage({dataUrl: $('.data-url').text()})
   }.bind(this))
@@ -84,6 +106,12 @@ PageController.prototype.setupPageSettings = function () {
 
 PageController.prototype.resetCharts = function () {
   this.fetchData(this.parameters.dataUrl, function (data) {
+    // set background color
+    this.applyColor()
+
+    // set embed style
+    this.applyEmbed()
+
     this.setupPageSettings()
     this.data = data
 
@@ -100,7 +128,7 @@ PageController.prototype.resetCharts = function () {
     }.bind(this))
 
     this.setDimensions()
-    this.setUrl()
+    this.updatePageState()
   }.bind(this))
 }
 
@@ -202,7 +230,7 @@ PageController.prototype.moveToChart = function (series, fromChartIndex, toChart
   }
 
   this.setDimensions()
-  this.setUrl()
+  this.updatePageState()
 }
 
 
@@ -237,7 +265,9 @@ PageController.prototype.getFullParams = function (chartIndex) {
 
 PageController.prototype.getDefaultTitle = function (chartIndex) {
   var series = this.parameters.charts[chartIndex].series
-  if (series.length === 1) {
+  if (!series) {
+    return 'Charted'
+  } else if (series.length === 1) {
     return this.getSeriesName(series[0])
   }
   var earlierCharts = this.parameters.charts.filter(function (chart, i) {
@@ -294,16 +324,39 @@ PageController.prototype.toggleColor = function () {
   this.chartObjects.forEach(function (chart) {
     chart.render()
   })
-  this.setUrl()
+  this.updatePageState()
 }
 
 
 PageController.prototype.applyColor = function () {
-  if (this.parameters.color == this.DARK) {
+  if (this.parameters.color === this.DARK) {
     this.$body.addClass(this.DARK)
   } else {
     this.$body.removeClass(this.DARK)
   }
+}
+
+
+PageController.prototype.toggleGrid = function () {
+  this.parameters.grid = this.parameters.grid === this.FULL ? this.SPLIT : this.FULL
+  this.applyGrid()
+  this.setDimensions()
+  this.updatePageState()
+}
+
+
+PageController.prototype.applyGrid = function () {
+  if (this.parameters.grid === this.FULL) {
+    this.$body.addClass(this.FULL)
+  } else {
+    this.$body.removeClass(this.FULL)
+  }
+
+  var gridSettingHTML = this.gridSettingsHTML()
+  $('.grid-option').html(gridSettingHTML)
+  $('.toggle-grid').click(function () {
+    this.toggleGrid()
+  }.bind(this))
 }
 
 
@@ -312,35 +365,62 @@ PageController.prototype.getPageColor = function () {
 }
 
 
+PageController.prototype.getEmbed = function () {
+  var embedId = this._getHashCode(window.location.href)
+  var embedUrl = window.location.href + '&embed=' + embedId
+
+  this.$body.append(this.embedOverlayHTML({
+    iframeHTML: '<iframe id="charted:' + embedId + '" src="' + embedUrl + '" '+
+        'height="600px" width="100%" scrolling="yes" style="border: solid 1px #ccc"></iframe>',
+    scriptHTML: '<script src="' + window.location.origin + '/embed.js"></script>'
+  }))
+
+  this.$body.find('.overlay-content').click(function (event) {
+    event.stopPropagation()
+  })
+
+  this.$body.click(function () {
+    $('.overlay-container').remove()
+  })
+
+}
+
+
+PageController.prototype.applyEmbed = function () {
+  if (this.parameters.embed) {
+    this.$body.addClass('embed')
+  } else {
+    this.$body.removeClass('embed')
+  }
+}
+
+
+PageController.prototype.getEditability = function () {
+  return !this.parameters.embed
+}
+
+
 PageController.prototype.getChartDimensions = function () {
   // get all values to use
   var minHeightForHalfHeight = 600
   var minWidthForHalfWidth = 1200
   var minWidthForFullHeight = 800
-  var minPixelsPerDatum = 5
   var windowWidth = $(window).innerWidth()
   var windowHeight = 'innerHeight' in window ? window.innerHeight: document.documentElement.offsetHeight
-  var approximateChartSpaceInGrid = (windowWidth / 2) - 200 //200px are taken up by the title/legend side pane
-  var pixelsPerDatum = approximateChartSpaceInGrid / this.data.getDatumCount()
   var defaultHeight = windowWidth > minWidthForFullHeight ? windowHeight : 'auto'
   var chartCount = this.chartObjects ? this.chartObjects.length : 0
 
   // check conditions for adjusting dimensions
-  var enoughWidthForHalfWidth = windowWidth > minWidthForHalfWidth && pixelsPerDatum >= minPixelsPerDatum
+  var useHalfWidth = chartCount >= 2 && windowWidth > minWidthForHalfWidth && this.parameters.grid !== this.FULL
   var enoughHeightForHalfHeight = windowHeight > minHeightForHalfHeight && windowWidth > minWidthForFullHeight
-  var enoughChartsForHalfWidth = chartCount >= 2
-  var enoughChartsForHalfHeight = chartCount >= 3 || (chartCount === 2 && !enoughWidthForHalfWidth)
-
-  // determine dimension types
-  var useGrid = chartCount >= 3 && windowWidth > minWidthForHalfWidth && windowHeight > minHeightForHalfHeight
-  var useHalfWidth = useGrid || (enoughWidthForHalfWidth && enoughChartsForHalfWidth)
-  var useHalfHeight = useGrid || (enoughHeightForHalfHeight && enoughChartsForHalfHeight)
+  var enoughChartsForHalfHeight = chartCount >= 3 || (chartCount === 2 && !useHalfWidth)
+  var useHalfHeight = enoughHeightForHalfHeight && enoughChartsForHalfHeight
 
   return {
     width: useHalfWidth ? windowWidth / 2 : windowWidth,
     height: useHalfHeight ? windowHeight / 2 : defaultHeight,
     isHalfHeight: useHalfHeight,
-    isGrid: useGrid || (enoughWidthForHalfWidth && enoughChartsForHalfWidth)
+    isGrid: useHalfWidth
   }
 }
 
@@ -367,6 +447,21 @@ PageController.prototype.setDimensions = function () {
     }
     chart.render()
   })
+
+  this.applyGrid()
+  this.maybeBroadcastDimensions()
+}
+
+
+PageController.prototype.maybeBroadcastDimensions = function () {
+  if (!this.parameters.embed) {
+    return
+  }
+
+  var message = this.parameters.embed + ':' + String(document.body.scrollHeight)
+  if (window.parent) {
+    window.parent.postMessage(message, '*' /* Any site can embed charted */)
+  }
 }
 
 
@@ -374,7 +469,11 @@ PageController.prototype.errorNotify = function (error) {
   /*jshint devel:true */
 
   this.$body.addClass('error').removeClass('loading')
-  var displayMessage = error.message || 'There’s been an error. Please check that you are using a valid .csv file. If you are using a Google Spreadsheet or Dropbox link, the privacy setting must be set to shareable.'
+  this.updatePageTitle()
+  var displayMessage = error.message || 'There’s been an error. Please check that '+
+    'you are using a valid .csv file. If you are using a Google Spreadsheet or Dropbox '+
+    'link, the privacy setting must be set to shareable.'
+
   $('.error-message').html(displayMessage)
 
   if(error && error.reponseText) {
@@ -383,14 +482,50 @@ PageController.prototype.errorNotify = function (error) {
 }
 
 
-PageController.prototype.setUrl = function () {
-  var minParams = this.getMinParams()
-  var url = '?' + encodeURIComponent(JSON.stringify(minParams))
-  window.history.pushState(null, null, url)
+PageController.prototype.updatePageState = function () {
+  //update page title
+  this.updatePageTitle()
+
+  // set url
+  var minDataParams = this.getMinDataParams()
+  var embedString = this.parameters.embed ? '&format=embed' : ''
+  var url = '?' + encodeURIComponent(JSON.stringify(minDataParams)) + embedString
+
+  // only push a new state if the new url differs from the current url
+  if (window.location.search !== url) {
+    window.history.pushState({isChartUpdate: true}, null, url)
+  }
 }
 
 
-PageController.prototype.getMinParams = function () {
+PageController.prototype.updatePageTitle = function (pageTitleString) {
+  var pageTitle = 'Charted'
+  var charts = []
+  if (this.parameters && this.parameters.charts) {
+    charts = this.parameters.charts
+  }
+
+  if (pageTitleString) {
+    pageTitle = pageTitleString
+  } else if (charts.length > 0) {
+    // if there's a chart, use the chart titles
+    pageTitle = charts.map(function (chart, i) {
+      return chart.title || this.getDefaultTitle(i)
+    }.bind(this)).join(', ')
+
+    // if it's just one chart called "Chart", add the series names
+    if (pageTitle === 'Chart') {
+      pageTitle += ' of ' + charts[0].series.map(function (series) {
+        return this.getSeriesName(series)
+      }.bind(this)).join(', ')
+    }
+  }
+
+  document.title = pageTitle
+}
+
+
+PageController.prototype.getMinDataParams = function () {
   var minParams = {}
   minParams.dataUrl = this.parameters.dataUrl
 
@@ -402,6 +537,11 @@ PageController.prototype.getMinParams = function () {
   // add color if applicable
   if (this.parameters.color && this.parameters.color !== this.LIGHT) {
     minParams.color = this.parameters.color
+  }
+
+  // add grid if applicable
+  if (this.parameters.grid && this.parameters.grid !== this.SPLIT) {
+    minParams.grid = this.parameters.grid
   }
 
   // add applicable chart parameters
@@ -444,13 +584,28 @@ PageController.prototype.getMinParams = function () {
 
 PageController.prototype.useUrl = function () {
   var urlParameters = Utils.getUrlParameters()
+  var parameters = urlParameters.data || {}
 
-  // support prior csvUrl parameter
-  urlParameters.dataUrl = urlParameters.csvUrl || urlParameters.dataUrl
+  // support prior csvUrl parameter and array format
+  parameters = (parameters instanceof Array) ? parameters[0] : parameters
+  parameters.dataUrl = parameters.csvUrl || parameters.dataUrl
 
-  if (!urlParameters.dataUrl) return
-  $('.data-input').val(urlParameters.dataUrl)
-  this.setupPage(urlParameters)
+  // add embed values
+  if (urlParameters.embed) {
+    parameters.embed = urlParameters.embed
+    this.$body.addClass('is-embed')
+
+  }
+
+  // handle the state change from chart -> pre-load
+  if (!parameters.dataUrl) {
+    this.clearExisting()
+    this.$body.addClass('pre-load')
+    return
+  }
+
+  $('.data-file-input').val(parameters.dataUrl)
+  this.setupPage(parameters)
 }
 
 
@@ -476,7 +631,6 @@ PageController.prototype.prepareDataUrl = function (url) {
   return url
 }
 
-
 PageController.prototype.pageSettingsHTML = function () {
   var template = ''
   template += '<div class="page-settings">'
@@ -485,14 +639,62 @@ PageController.prototype.pageSettingsHTML = function () {
   template += '    <div class="page-options">'
   template += '      <a class="page-option-item download-data" title="Download data"><span class="icon icon-download"></span>Download data</a>'
   template += '      <button class="page-option-item toggle-color" title="Switch background color"><span class="icon icon-color"></span>Switch background</button>'
+  template += '      <div class="grid-option"></div>'
+  template += '      <button class="page-option-item get-embed" title="Get embed code"><span class="icon icon-embed"></span>Get embed code</button>'
   template += '    </div>'
   template += '    <div class="data-source">'
   template += '      <p>Data File:</p>'
   template += '      <div class="data-url info-input" contenteditable="true"></div>'
   template += '      <button type="submit" class="update-data-url">Save</button>'
   template += '    </div>'
-  template += '    <a href="/" class="page-option-item go-home"><span class="icon icon-back"></span>Charted home</a>'
+  template += '    <a href="." class="page-option-item go-home"><span class="icon icon-back"></span>Charted home</a>'
   template += '  </div>'
   template += '</div>'
   return _.template(template)
 }
+
+
+PageController.prototype.gridSettingsHTML = function () {
+  var fullTemplate = '<button class="page-option-item toggle-grid" title="Show full width charts"><span class="icon icon-full-screen"></span>Show full width charts</button>'
+  var splitTemplate = '<button class="page-option-item toggle-grid" title="Show split-screen charts"><span class="icon icon-split-screen"></span>Show split-screen charts</button>'
+  var templateToUse = this.parameters.grid === this.FULL ? splitTemplate : fullTemplate
+  var chartCount = this.chartObjects ? this.chartObjects.length : 0
+  return chartCount > 1 ? templateToUse : ''
+}
+
+
+PageController.prototype.embedOverlayHTML = function (params) {
+  var template = ''
+  template += '<div class="overlay-container">'
+  template += '  <div class="overlay-content">'
+  template += '    <h1 class="overlay-title">Embed this Charted page</h1>'
+  template += '    <p class="overlay-description">You can add this embed to your website by copying and pasting the HTML code below.</p>'
+  template += '    <input class="embed-link" value="<%- iframeHTML %>\n<%- scriptHTML %>"/>'
+  template += '    <div class="iframe-container"><%= iframeHTML %></div>'
+  template += '  </div>'
+  template += '  <div class="overlay-close"><span class="icon icon-x"></span></div>'
+  template += '</div>'
+  return _.template(template, params)
+}
+
+
+/**
+ * Converts a string into a hash code. A clone of Java's String.hashCode()
+ *
+ * @param {string} str
+ * @return {number}
+ */
+PageController.prototype._getHashCode = function (str) {
+  if (str.length == 0) {
+    return 0
+  }
+
+  var hash = 0
+  for (var i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash = hash & hash // convert to 32 bit integer
+  }
+
+  return hash
+}
+

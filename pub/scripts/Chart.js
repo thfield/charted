@@ -5,7 +5,10 @@ function Chart(pageController, chartIndex, $wrapper, params, data) {
   this.$wrapper = $wrapper
 
   // create initial HTML
-  this.$wrapper.html(this.chartHTML())
+  var chartHtmlParameters = {
+    editable: pageController.getEditability()
+  }
+  this.$wrapper.html(this.chartHTML(chartHtmlParameters))
 
   // cache elements
   this.$container = $wrapper.find('.chart').first()
@@ -145,7 +148,7 @@ Chart.prototype.updateSizes = function () {
   this.xScale.range([this.margin.left, (this.width - this.margin.right - this.margin.left)])
   this.yScale.range([this.height - this.margin.bottom, this.margin.top])
   this.xEndEdge = this.$xEnd.offset().left - this.$plot.offset().left
-  this.xBegEdge = this.$xBeg.offset().left - this.$plot.offset().left + this.$xEnd.width()
+  this.xBegEdge = this.$xBeg.offset().left - this.$plot.offset().left + this.$xBeg.width()
 }
 
 Chart.prototype.render = function () {
@@ -348,7 +351,7 @@ Chart.prototype.bindInteractions = function () {
       var options = this.pageController.OPTIONS[option]
       this.params[option] = this.params[option] === options[0] ? options[1] : options[0]
       this.render()
-      this.pageController.setUrl()
+      this.pageController.updatePageState()
     }.bind(this))
   }.bind(this))
 
@@ -363,27 +366,40 @@ Chart.prototype.bindInteractions = function () {
         this.params[item] = $elem.text()
         this.updateEditablePlaceholder(item)
       }
-      this.pageController.setUrl()
+      this.pageController.updatePageState()
     }.bind(this))
   }.bind(this))
 
   // handle mouseover
-  this.$container.mousemove(function (e) {
-    this.handleMouseover(e)
-  }.bind(this))
+  this.$container.mousemove(this.handleMouseover.bind(this))
 }
 
 Chart.prototype.handleMouseover = function(pixel) {
   // show the options
   this.$container.addClass('active')
   $('body').addClass('page-active')
-  clearTimeout(this.mouseTimer)
+
+  if (this.mouseTimer) {
+    clearTimeout(this.mouseTimer)
+    this.mouseTimer = null
+  }
+
   this.mouseTimer = setTimeout(function () {
-    if (! this.$optionsElem.is(':hover') && ! this.$chartDescription.is(':hover') && ! this.$pageSettings.is(':hover')) {
-      this.$container.removeClass('active')
-      $('body').removeClass('page-active')
-      this.$pageSettings.removeClass('open')
+    if (this.$optionsElem.length && this.$optionsElem.is(':hover')) {
+      return
     }
+
+    if (this.$chartDescription.length && this.$chartDescription.is(':hover')) {
+      return
+    }
+
+    if (this.$pageSettings.length && this.$pageSettings.is(':hover')) {
+      return
+    }
+
+    this.$container.removeClass('active')
+    $('body').removeClass('page-active')
+    this.$pageSettings.removeClass('open')
   }.bind(this), 1000)
 
   // don't change the selection if mouseover is below the plot
@@ -424,7 +440,7 @@ Chart.prototype.getClosestPoint = function(pixel) {
     // determine if position is over a y series stack, else show the total
     var yValueExtent = this.data.getStackedExtentForIndex(currentX)
     var yPixelExtent = [this.yScale(yValueExtent[0]), this.yScale(yValueExtent[1])]
-    if (pixelY < yPixelExtent[1] || pixelY > yPixelExtent[0]) {
+    if (pixelY <= yPixelExtent[1] || pixelY > yPixelExtent[0]) {
       currentY = this.data.getSeriesCount()
     }
   }
@@ -467,8 +483,8 @@ Chart.prototype.chartHTML = function (parameters) {
   var template = ''
   template +='<div class="chart show-columns">'
   template +='  <div class="chart-description">'
-  template +='    <h1 class="title info-input" contenteditable="true"></h1>'
-  template +='    <div class="note info-input" contenteditable="true"></div>'
+  template +='    <h1 class="title info-input" <% if (editable) {%> contenteditable="true" <%}%> ></h1>'
+  template +='    <div class="note info-input" <% if (editable) {%> contenteditable="true" <%}%> ></div>'
   template +='  </div>'
   template +='  <div class="chart-plot-outer-container">'
   template +='    <div class="chart-plot-inner-container">'
@@ -488,16 +504,18 @@ Chart.prototype.chartHTML = function (parameters) {
   template +='  </div>'
   template +='  <aside class="chart-info">'
   template +='    <ul class="legend hidden"></ul>'
-  template +='    <div class="chart-options">'
-  template +='      <a class="option-item toggle-type" href="#" title="Switch chart type">'
-  template +='        <span class="icon icon-line"></span>'
-  template +='        <span class="icon icon-column"></span>'
-  template +='      </a>'
-  template +='      <a class="option-item toggle-rounding" href="#" title="Turn rounding on/off">'
-  template +='        <span class="icon icon-round-off"></span>'
-  template +='        <span class="icon icon-round-on"></span>'
-  template +='      </a>'
-  template +='    </div>'
+  template +='    <% if (editable) { %>'
+  template +='      <div class="chart-options">'
+  template +='        <a class="option-item toggle-type" href="#" title="Switch chart type">'
+  template +='          <span class="icon icon-line"></span>'
+  template +='          <span class="icon icon-column"></span>'
+  template +='        </a>'
+  template +='        <a class="option-item toggle-rounding" href="#" title="Turn rounding on/off">'
+  template +='          <span class="icon icon-round-off"></span>'
+  template +='          <span class="icon icon-round-on"></span>'
+  template +='        </a>'
+  template +='      </div>'
+  template +='    <% } %>'
   template +='  </aside>'
   template +='</div>'
   return _.template(template, parameters)

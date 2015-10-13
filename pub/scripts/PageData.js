@@ -9,13 +9,20 @@ function PageData(dataUrl, callback) {
 }
 
 PageData.prototype.fetchData = function () {
-  var url = '/get/?url=' + encodeURIComponent(this.dataUrl)
+  var url = 'get/?url=' + encodeURIComponent(this.dataUrl)
   d3.text(url, function (error, fileString) {
     if (error) {
       return this.callback(error, null)
     }
 
-    var fileRows = d3.csv.parseRows(fileString)
+    var fileExtention = Utils.getFileExtension(this.dataUrl)
+    var fileRows = []
+    if (fileExtention === 'tsv') {
+      fileRows = d3.tsv.parseRows(fileString)
+    } else {
+      fileRows = d3.csv.parseRows(fileString)
+    }
+
     var fileFieldNames = fileRows.shift()
     // create array of row objects with the field names as keys
     var fileData = fileRows.map(function (fileRow) {
